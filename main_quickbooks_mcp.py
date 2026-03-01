@@ -2,6 +2,7 @@ from mcp import types
 from mcp.server.fastmcp import FastMCP
 from quickbooks_interaction import QuickBooksSession
 from api_importer import load_apis
+from environment import Environment
 import sys
 import json
 from pathlib import Path
@@ -172,5 +173,6 @@ def register_all_apis():
 register_all_apis()
 
 if __name__ == "__main__":
-    print("Starting MCP server...")
-    mcp.run(transport='stdio') 
+    transport = Environment.get('MCP_TRANSPORT', 'stdio')
+    print(f"Starting MCP server ({transport})...", file=sys.stderr)
+    mcp.run(transport=transport)

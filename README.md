@@ -118,10 +118,17 @@ docker load -i quickbooks-mcp-server.tar
 
 ### Running the Container
 
-The server uses stdio transport for MCP communication. Pass your QuickBooks credentials as environment variables:
+The server supports two transport modes:
+
+- **stdio** — for local use with Claude Desktop (default when running outside Docker)
+- **SSE** — for remote HTTP access (default in Docker), allowing Claude.ai or other clients to connect over the network
+
+#### SSE Mode (Remote Access — Docker Default)
+
+The Docker image defaults to SSE transport on port 8000:
 
 ```bash
-docker run --rm \
+docker run --rm -p 8000:8000 \
   -e QUICKBOOKS_CLIENT_ID=your_client_id \
   -e QUICKBOOKS_CLIENT_SECRET=your_client_secret \
   -e QUICKBOOKS_REFRESH_TOKEN=your_refresh_token \
@@ -130,11 +137,40 @@ docker run --rm \
   quickbooks-mcp-server:latest
 ```
 
+The server will listen on `http://localhost:8000/sse`. You can verify it's running with:
+
+```bash
+curl http://localhost:8000/sse
+```
+
+#### stdio Mode (Claude Desktop via Docker)
+
+To use stdio transport with Docker (e.g., for Claude Desktop), override the transport:
+
+```bash
+docker run --rm -i \
+  -e MCP_TRANSPORT=stdio \
+  -e QUICKBOOKS_CLIENT_ID=your_client_id \
+  -e QUICKBOOKS_CLIENT_SECRET=your_client_secret \
+  -e QUICKBOOKS_REFRESH_TOKEN=your_refresh_token \
+  -e QUICKBOOKS_COMPANY_ID=your_company_id \
+  -e QUICKBOOKS_ENV=sandbox \
+  quickbooks-mcp-server:latest
+```
+
+#### Transport Environment Variables
+
+| Variable | Default (Docker) | Description |
+|---|---|---|
+| `MCP_TRANSPORT` | `sse` | Transport mode: `stdio` or `sse` |
+| `FASTMCP_HOST` | `0.0.0.0` | Host to bind to (SSE mode only) |
+| `FASTMCP_PORT` | `8000` | Port to listen on (SSE mode only) |
+
 Set `QUICKBOOKS_ENV` to `production` when using real QuickBooks data.
 
-### Claude Desktop Config (Docker)
+### Claude Desktop Config (Docker — stdio)
 
-To use the Docker container with Claude Desktop, update your `claude_desktop_config.json`:
+To use the Docker container with Claude Desktop locally, update your `claude_desktop_config.json`:
 
 ```json
 {
@@ -143,6 +179,7 @@ To use the Docker container with Claude Desktop, update your `claude_desktop_con
       "command": "docker",
       "args": [
         "run", "--rm", "-i",
+        "-e", "MCP_TRANSPORT=stdio",
         "-e", "QUICKBOOKS_CLIENT_ID=your_client_id",
         "-e", "QUICKBOOKS_CLIENT_SECRET=your_client_secret",
         "-e", "QUICKBOOKS_REFRESH_TOKEN=your_refresh_token",
@@ -154,6 +191,16 @@ To use the Docker container with Claude Desktop, update your `claude_desktop_con
   }
 }
 ```
+
+### Connecting Claude.ai (Remote — SSE)
+
+To connect Claude.ai (or any MCP client) to a remotely running SSE server:
+
+1. Run the Docker container with SSE mode (the default) on your server/NAS.
+2. Ensure port 8000 is accessible (via port forwarding, reverse proxy, etc.).
+3. In Claude.ai, add an MCP server with the URL: `https://your-domain.com/sse`
+
+If using **Nginx Proxy Manager**, create a proxy host pointing to `http://<nas-ip>:8000` with SSL enabled.
 
 ---
 
@@ -173,7 +220,8 @@ These steps walk you through deploying the server on a Synology NAS using Contai
 1. Go to **Container Manager** > **Container** > **Create**.
 2. Select the `quickbooks-mcp-server:latest` image.
 3. Name the container (e.g., `quickbooks-mcp`).
-4. Under **Advanced Settings** > **Environment**, add these variables:
+4. Under **Advanced Settings** > **Port Settings**, map local port `8000` to container port `8000` (TCP).
+5. Under **Advanced Settings** > **Environment**, add these variables:
 
    | Variable | Value |
    |---|---|
@@ -182,13 +230,14 @@ These steps walk you through deploying the server on a Synology NAS using Contai
    | `QUICKBOOKS_REFRESH_TOKEN` | Your QuickBooks Refresh Token |
    | `QUICKBOOKS_COMPANY_ID` | Your QuickBooks Company ID |
    | `QUICKBOOKS_ENV` | `sandbox` or `production` |
+   | `MCP_TRANSPORT` | `sse` (default) |
+   | `FASTMCP_PORT` | `8000` (default) |
 
-5. No port mapping or volume mounts are required — the server communicates via stdio.
 6. Click **Apply** to create the container.
 
 ### 3. Notes
 
 - The image is built for `linux/amd64`, which is compatible with most Synology NAS models.
-- The container does not need network ports exposed since MCP uses stdio transport.
+- The Docker image defaults to SSE transport on port 8000. Use Nginx Proxy Manager or Synology's reverse proxy to expose it with SSL.
 - Store your credentials securely. Do not commit `.env` files or credentials to version control.
 - To update the server, rebuild the tar from the latest source and re-import it via Container Manager.
