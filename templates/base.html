@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin Portal{% endblock %} — QuickBooks MCP</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {% if session and not session.get('must_change_password') %}
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>QB MCP</h2>
+        </div>
+        <ul>
+            <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
+            <li><a href="/flagged" class="{% if '/flagged' in request.url.path %}active{% endif %}">Flagged Items</a></li>
+            <li><a href="/rules" class="{% if '/rules' in request.url.path %}active{% endif %}">Rules</a></li>
+            <li><a href="/scheduler" class="{% if '/scheduler' in request.url.path %}active{% endif %}">Scheduler</a></li>
+            <li><a href="/settings" class="{% if '/settings' in request.url.path %}active{% endif %}">Settings</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <span>{{ session.username }}</span>
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="{% if session and not session.get('must_change_password') %}with-sidebar{% endif %}">
+        {% for flash in flashes %}
+        <div class="flash flash-{{ flash.category }}">{{ flash.message }}</div>
+        {% endfor %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="/static/admin.js"></script>
+</body>
+</html>

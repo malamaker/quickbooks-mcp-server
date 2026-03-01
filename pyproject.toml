@@ -1,6 +1,6 @@
 [project]
 name = "quickbooksmcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "An MCP server that interacts with all QuickBooks public APIs."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -8,6 +8,15 @@ dependencies = [
     "mcp[cli]>=1.4.1",
     "requests>=2.32.3",
     "python-dotenv>=1.0.1",
+    "fastapi>=0.115.0",
+    "jinja2>=3.1.4",
+    "python-multipart>=0.0.18",
+    "aiosqlite>=0.21.0",
+    "bcrypt>=4.3.0",
+    "cryptography>=44.0.0",
+    "apscheduler>=3.10.4",
+    "anthropic>=0.43.0",
+    "itsdangerous>=2.2.0",
 ]
 
 [build-system]

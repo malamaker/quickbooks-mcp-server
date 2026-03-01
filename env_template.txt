@@ -5,8 +5,14 @@ QUICKBOOKS_COMPANY_ID=your_company_id_here
 QUICKBOOKS_ENV=sandbox
 
 # MCP Transport Settings
-# stdio = local Claude Desktop (default), sse = remote HTTP access
+# stdio = local Claude Desktop (default), streamable-http = remote HTTP access
 MCP_TRANSPORT=stdio
-# Host and port for SSE mode (uses FastMCP settings prefix)
+# Host and port for HTTP mode (uses FastMCP settings prefix)
 FASTMCP_HOST=0.0.0.0
-FASTMCP_PORT=8000
+FASTMCP_PORT=8080
+
+# Admin Portal & Encryption
+# Optional: auto-generated if not set. Stored in DATA_DIR/.secret_key
+SECRET_KEY=
+# Persistent data directory (database, logs, encryption key)
+DATA_DIR=/app/data

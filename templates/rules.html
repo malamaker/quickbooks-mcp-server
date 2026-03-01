@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Rules{% endblock %}
+{% block content %}
+<h1>Categorization Rules</h1>
+
+<div class="section-header">
+    <div class="btn-group">
+        <a href="/rules/export" class="btn btn-secondary">Export JSON</a>
+        <button class="btn btn-secondary" onclick="document.getElementById('import-form').style.display='block'">Import JSON</button>
+        <button class="btn btn-primary" onclick="document.getElementById('create-form').style.display='block'">New Rule</button>
+    </div>
+</div>
+
+<!-- Import Form -->
+<div id="import-form" class="card" style="display:none; margin-bottom:1rem;">
+    <form method="post" action="/rules/import" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="form-row">
+            <input type="file" name="file" accept=".json" required>
+            <button type="submit" class="btn btn-primary">Upload</button>
+            <button type="button" class="btn btn-secondary" onclick="this.closest('.card').style.display='none'">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<!-- Create Form -->
+<div id="create-form" class="card" style="display:none; margin-bottom:1rem;">
+    <h3>New Rule</h3>
+    <form method="post" action="/rules">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Type</label>
+                <select name="rule_type" class="form-select" required>
+                    <option value="vendor_category">Vendor Category</option>
+                    <option value="always_ignore">Always Ignore</option>
+                    <option value="threshold_flag">Threshold Flag</option>
+                    <option value="personal_card_exclude">Personal Card Exclude</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Pattern</label>
+                <input type="text" name="pattern" class="form-input" required placeholder="e.g. Amazon, AWS*">
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <input type="text" name="category" class="form-input" placeholder="e.g. Office Supplies">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <input type="text" name="description" class="form-input" placeholder="Optional description">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Create</button>
+            <button type="button" class="btn btn-secondary" onclick="this.closest('.card').style.display='none'">Cancel</button>
+        </div>
+    </form>
+</div>
+
+{% for rule_type, type_rules in grouped_rules.items() %}
+<div class="section">
+    <h2>{{ rule_type | replace('_', ' ') | title }}</h2>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Pattern</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Source</th>
+                <th>Enabled</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rule in type_rules %}
+            <tr id="rule-{{ rule.id }}">
+                <td>{{ rule.pattern }}</td>
+                <td>{{ rule.category or "—" }}</td>
+                <td>{{ rule.description or "—" }}</td>
+                <td><span class="badge badge-{{ rule.source }}">{{ rule.source }}</span></td>
+                <td>
+                    <button class="btn btn-sm {% if rule.enabled %}btn-success{% else %}btn-secondary{% endif %}"
+                            onclick="toggleRule({{ rule.id }})">
+                        {{ "On" if rule.enabled else "Off" }}
+                    </button>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="editRule({{ rule.id }})">Edit</button>
+                    <form method="post" action="/rules/{{ rule.id }}/delete" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this rule?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+
+{% if not grouped_rules %}
+<p class="empty-state">No rules defined. Create a new rule or import from JSON.</p>
+{% endif %}
+{% endblock %}

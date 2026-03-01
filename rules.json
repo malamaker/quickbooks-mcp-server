@@ -1,0 +1,19 @@
+[
+  {"rule_type": "vendor_category", "pattern": "AWS", "category": "Software & Cloud Services", "description": "Amazon Web Services", "enabled": 1, "source": "manual"},
+  {"rule_type": "vendor_category", "pattern": "Azure", "category": "Software & Cloud Services", "description": "Microsoft Azure", "enabled": 1, "source": "manual"},
+  {"rule_type": "vendor_category", "pattern": "Google Cloud", "category": "Software & Cloud Services", "description": "Google Cloud Platform", "enabled": 1, "source": "manual"},
+  {"rule_type": "vendor_category", "pattern": "Adobe", "category": "Software Subscriptions", "description": "Adobe products", "enabled": 1, "source": "manual"},
+  {"rule_type": "vendor_category", "pattern": "Office Depot", "category": "Office Supplies", "description": "Office supplies vendor", "enabled": 1, "source": "manual"},
+  {"rule_type": "vendor_category", "pattern": "Staples", "category": "Office Supplies", "description": "Office supplies vendor", "enabled": 1, "source": "manual"},
+  {"rule_type": "vendor_category", "pattern": "Meals*<75", "category": "Meals & Entertainment", "description": "Meals under $75", "enabled": 1, "source": "manual"},
+  {"rule_type": "threshold_flag", "pattern": "Meals*>75", "category": "Meals & Entertainment", "description": "Meals over $75 — flag for review", "enabled": 1, "source": "manual"},
+  {"rule_type": "personal_card_exclude", "pattern": "Netflix", "category": null, "description": "Personal streaming service", "enabled": 1, "source": "manual"},
+  {"rule_type": "personal_card_exclude", "pattern": "Spotify", "category": null, "description": "Personal streaming service", "enabled": 1, "source": "manual"},
+  {"rule_type": "personal_card_exclude", "pattern": "Grocery", "category": null, "description": "Personal grocery expense", "enabled": 1, "source": "manual"},
+  {"rule_type": "personal_card_exclude", "pattern": "Pharmacy", "category": null, "description": "Personal pharmacy expense", "enabled": 1, "source": "manual"},
+  {"rule_type": "personal_card_exclude", "pattern": "Gas Station", "category": null, "description": "Personal fuel expense", "enabled": 1, "source": "manual"},
+  {"rule_type": "vendor_category", "pattern": "Home Depot", "category": "Equipment & Supplies", "description": "Home improvement store", "enabled": 1, "source": "manual"},
+  {"rule_type": "vendor_category", "pattern": "Lowes", "category": "Equipment & Supplies", "description": "Home improvement store", "enabled": 1, "source": "manual"},
+  {"rule_type": "threshold_flag", "pattern": "Home Depot*>200", "category": "Equipment & Supplies", "description": "Home Depot purchases over $200 — flag for review", "enabled": 1, "source": "manual"},
+  {"rule_type": "threshold_flag", "pattern": "Lowes*>200", "category": "Equipment & Supplies", "description": "Lowes purchases over $200 — flag for review", "enabled": 1, "source": "manual"}
+]

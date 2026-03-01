@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="auth-container">
+    <h1>QuickBooks MCP Admin</h1>
+    {% for flash in flashes %}
+    <div class="flash flash-{{ flash.category }}">{{ flash.message }}</div>
+    {% endfor %}
+    <form method="post" action="/login" class="auth-form">
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required autofocus>
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Login</button>
+    </form>
+    <div class="login-disclaimer">
+        <p>This software modifies live QuickBooks financial data. By logging in you acknowledge you have read the <a href="/disclaimer">disclaimer</a> and accept all responsibility for use of this tool.</p>
+    </div>
+</div>
+{% endblock %}
