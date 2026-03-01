@@ -1,6 +1,6 @@
 # 🧾 QuickBooks MCP Server
 
-> A secure, local-first Model Context Protocol (MCP) server to query QuickBooks data using natural language inside Claude Desktop.
+> A secure Model Context Protocol (MCP) server to query QuickBooks data using natural language via Claude Desktop or any remote MCP client.
 
 --- 
 
@@ -13,7 +13,7 @@ Being listed and certified on MCP Review ensures this server adheres to MCP stan
 ---
 
 ## Requirements:
-1. Python 3.10 or higher
+1. Python 3.12 or higher
 
 ## Environment Setup
 For local development, create a `.env` file in the project root with your QuickBooks credentials:
