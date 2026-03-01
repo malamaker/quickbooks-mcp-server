@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Acknowledge Disclaimer{% endblock %}
+{% block content %}
+<div class="acknowledge-container">
+    <h1>Disclaimer Acknowledgment</h1>
+    <p>Before you can use the admin portal, please read the following disclaimer carefully and confirm your understanding.</p>
+
+    <div class="disclaimer-text-box">
+        <h2>Independent Project</h2>
+        <p>This is an independent open source project, <strong>not affiliated with or endorsed by Intuit or Anthropic</strong>.</p>
+
+        <hr>
+
+        <h2>What This Software Does</h2>
+        <p>This tool connects directly to the QuickBooks API and can <strong>read, create, modify, and delete financial data</strong> in your QuickBooks account. Any changes are real and may be difficult or impossible to undo.</p>
+
+        <hr>
+
+        <h2>No Warranty &amp; Limitation of Liability</h2>
+        <p>This software is provided <strong>"AS IS"</strong> without warranty of any kind. The authors and contributors accept <strong>no responsibility</strong> for data loss, incorrect categorizations, tax filing errors, audit issues, or any financial harm resulting from use of this software.</p>
+
+        <hr>
+
+        <h2>AI Categorization Is Not Accounting Advice</h2>
+        <p>AI categorization is <strong>not a substitute for a licensed accountant, CPA, or professional bookkeeper</strong>. AI models can and do make mistakes. You are solely responsible for reviewing all AI-generated categorizations before relying on them for tax filing or financial reporting.</p>
+
+        <hr>
+
+        <h2>Automated Scheduler Warning</h2>
+        <p>When enabled, the scheduler runs autonomously and will modify QuickBooks data <strong>without human approval for each individual action</strong>. Maintain backups, start with the scheduler disabled, and review results regularly.</p>
+
+        <hr>
+
+        <h2>Test Before Production</h2>
+        <p>Always test in a <strong>QuickBooks Sandbox environment first</strong> before connecting to production data.</p>
+
+        <hr>
+
+        <p><strong>USE AT YOUR OWN RISK.</strong> See the <a href="/disclaimer" target="_blank">full disclaimer</a> for complete details.</p>
+    </div>
+
+    <form method="post" action="/acknowledge" id="ack-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="ack-checkboxes">
+            <label>
+                <input type="checkbox" id="ack1" onchange="checkAcks()">
+                I have read and understand the risks of using this tool with live QuickBooks financial data.
+            </label>
+            <label>
+                <input type="checkbox" id="ack2" onchange="checkAcks()">
+                I understand that AI categorization is not a substitute for a licensed accountant, and I will review all automated categorizations before relying on them.
+            </label>
+            <label>
+                <input type="checkbox" id="ack3" onchange="checkAcks()">
+                I have configured or will configure QuickBooks backups before enabling any automated features.
+            </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="ack-submit" disabled>I Acknowledge and Accept</button>
+    </form>
+</div>
+
+<script>
+function checkAcks() {
+    var btn = document.getElementById('ack-submit');
+    var c1 = document.getElementById('ack1').checked;
+    var c2 = document.getElementById('ack2').checked;
+    var c3 = document.getElementById('ack3').checked;
+    btn.disabled = !(c1 && c2 && c3);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Flagged Items{% endblock %}
+{% block content %}
+<h1>Flagged Items</h1>
+
+<div class="filter-bar">
+    <a href="/flagged" class="btn {% if not current_filter %}btn-primary{% else %}btn-secondary{% endif %}">All</a>
+    <a href="/flagged?status=pending" class="btn {% if current_filter == 'pending' %}btn-primary{% else %}btn-secondary{% endif %}">Pending</a>
+    <a href="/flagged?status=resolved" class="btn {% if current_filter == 'resolved' %}btn-primary{% else %}btn-secondary{% endif %}">Resolved</a>
+    <a href="/flagged?status=ignored" class="btn {% if current_filter == 'ignored' %}btn-primary{% else %}btn-secondary{% endif %}">Ignored</a>
+</div>
+
+{% if items %}
+<form method="post" action="/flagged/bulk-resolve" id="bulk-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="bulk-actions">
+        <label><input type="checkbox" id="select-all" onclick="toggleAll(this)"> Select All</label>
+        <select name="status" class="form-select">
+            <option value="resolved">Resolve</option>
+            <option value="ignored">Ignore</option>
+        </select>
+        <input type="text" name="notes" placeholder="Notes (optional)" class="form-input">
+        <button type="submit" class="btn btn-secondary">Bulk Action</button>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th><input type="checkbox" onclick="toggleAll(this)"></th>
+                <th>Date</th>
+                <th>Vendor</th>
+                <th>Amount</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td><input type="checkbox" name="item_ids" value="{{ item.id }}"></td>
+                <td>{{ item.transaction_date or "N/A" }}</td>
+                <td>{{ item.vendor or "Unknown" }}</td>
+                <td>${{ "%.2f"|format(item.amount or 0) }}</td>
+                <td>{{ item.reason_flagged }}</td>
+                <td><span class="badge badge-{{ item.status }}">{{ item.status }}</span></td>
+                <td>
+                    {% if item.status == 'pending' %}
+                    <button type="button" class="btn btn-sm btn-success" onclick="resolveItem({{ item.id }}, 'resolved')">Resolve</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="resolveItem({{ item.id }}, 'ignored')">Ignore</button>
+                    {% else %}
+                    {{ item.resolution_notes or "" }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</form>
+{% else %}
+<p class="empty-state">No flagged items{% if current_filter %} with status "{{ current_filter }}"{% endif %}.</p>
+{% endif %}
+{% endblock %}

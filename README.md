@@ -1,194 +1,266 @@
-# 🧾 QuickBooks MCP Server
+# QuickBooks MCP Server
 
-> A secure, local-first Model Context Protocol (MCP) server to query QuickBooks data using natural language inside Claude Desktop.
+> [!WARNING]
+> This tool directly reads, creates, modifies, and deletes live QuickBooks financial data. Incorrect categorizations could affect tax filings and financial records. The automated scheduler makes changes without per-action human approval. **Read [DISCLAIMER.md](DISCLAIMER.md) before deploying. Use at your own risk.**
 
---- 
-
-## ✅ MCP Review Certification
-
-This MCP Server is **[certified by MCP Review](https://mcpreview.com/mcp-servers/nikhilgy/quickbooks-mcp-server)**.
-
-Being listed and certified on MCP Review ensures this server adheres to MCP standards and best practices, and is trusted by the developer community.
+> A self-hosted Model Context Protocol (MCP) server for QuickBooks with an admin portal, automated transaction categorization scheduler, and AI-powered bookkeeping via Claude.
 
 ---
 
-## Requirements:
-1. Python 3.10 or higher
+## Architecture
+
+```
+Single Docker Container
+├── main_quickbooks_mcp.py     (entrypoint — starts both servers via asyncio.gather)
+├── MCP Server (port 8080)     (Streamable HTTP — external via Nginx Proxy Manager)
+├── Admin Portal (port 8888)   (FastAPI + Jinja2 — internal LAN only)
+├── APScheduler                (AsyncIOScheduler — shared event loop)
+└── /app/data/                 (volume-mounted persistent storage)
+    ├── quickbooks_mcp.db      (SQLite database)
+    ├── rules.json             (default categorization rules)
+    ├── scheduler.log          (scheduler run logs)
+    └── .secret_key            (auto-generated Fernet encryption key)
+```
+
+**Ports:**
+- **8080** — MCP server (Streamable HTTP). Expose externally via Nginx Proxy Manager for Claude.ai / remote MCP clients.
+- **8888** — Admin portal (FastAPI). Keep internal / LAN-only for management.
+
+---
+
+## Requirements
+
+- Python 3.12+
+- Docker (for containerized deployment)
+
+---
+
+## Quick Start (Docker Compose)
+
+1. Clone the repo and create a `.env` file:
+```bash
+git clone https://github.com/malamaker/quickbooks-mcp-server.git
+cd quickbooks-mcp-server
+cp env_template.txt .env
+# Edit .env with your QuickBooks credentials
+```
+
+2. Start with Docker Compose:
+```bash
+docker compose up -d
+```
+
+3. Access the admin portal at `http://localhost:8888`
+   - Default login: `admin` / `admin123`
+   - You'll be forced to change your password on first login
+
+4. Connect MCP clients to `http://localhost:8080/mcp`
+
+---
 
 ## Environment Setup
-For local development, create a `.env` file in the project root with your QuickBooks credentials:
+
+Create a `.env` file from the template:
 
 ```bash
-# Copy the template and fill in your actual credentials
 cp env_template.txt .env
 ```
 
-Then edit the `.env` file with your actual QuickBooks API credentials:
+| Variable | Default | Description |
+|---|---|---|
+| `QUICKBOOKS_CLIENT_ID` | — | QuickBooks OAuth Client ID |
+| `QUICKBOOKS_CLIENT_SECRET` | — | QuickBooks OAuth Client Secret |
+| `QUICKBOOKS_REFRESH_TOKEN` | — | QuickBooks OAuth Refresh Token |
+| `QUICKBOOKS_COMPANY_ID` | — | QuickBooks Company/Realm ID |
+| `QUICKBOOKS_ENV` | `sandbox` | `sandbox` or `production` |
+| `MCP_TRANSPORT` | `stdio` | `stdio` or `streamable-http` |
+| `FASTMCP_HOST` | `0.0.0.0` | Host to bind (HTTP mode) |
+| `FASTMCP_PORT` | `8080` | MCP server port (HTTP mode) |
+| `SECRET_KEY` | auto-generated | Fernet encryption key for sensitive DB fields |
+| `DATA_DIR` | `/app/data` | Persistent data directory |
+
+---
+
+## Local Development
+
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+uv sync
+
+# Run in stdio mode (default — for Claude Desktop)
+uv run python main_quickbooks_mcp.py
+
+# Run in HTTP mode (MCP + Admin Portal + Scheduler)
+MCP_TRANSPORT=streamable-http DATA_DIR=./data uv run python main_quickbooks_mcp.py
 ```
-QUICKBOOKS_CLIENT_ID=your_actual_client_id
-QUICKBOOKS_CLIENT_SECRET=your_actual_client_secret
-QUICKBOOKS_REFRESH_TOKEN=your_actual_refresh_token
-QUICKBOOKS_COMPANY_ID=your_actual_company_id
-QUICKBOOKS_ENV='sandbox' or 'production'
-```
 
-**Note:** The `.env` file is automatically ignored by git for security reasons.
+### Claude Desktop Configuration
 
-## Step 1. Install uv:
-   - MacOS/Linux: curl -LsSf https://astral.sh/uv/install.sh | sh
-   - Windows: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-## Step 2. Configure Claude Desktop
-1. Download [Claude Desktop](https://claude.ai/download).
-2. Launch Claude and go to Settings > Developer > Edit Config.
-3. Modify `claude_desktop_config.json` with:
 ```json
 {
   "mcpServers": {
     "QuickBooks": {
       "command": "uv",
       "args": [
-        "--directory",
-        "<absolute_path_to_quickbooks_mcp_folder>",
-        "run",
-        "main_quickbooks_mcp.py"
+        "--directory", "<absolute_path_to_quickbooks_mcp_folder>",
+        "run", "main_quickbooks_mcp.py"
       ]
     }
   }
 }
 ```
-4. Relaunch Claude Desktop.
-
-The first time you open Claude Desktop with these setting it may take
-10-20 seconds before the QuickBooks tools appear in the interface due to
-the installation of the required packages and the download of the most 
-recent QuickBooks API documentation.
-
-Everytime you launch Claude Desktop, the most recent QuickBooks API tools are made available 
-to your AI assistant.
-
-## Step 3. Launch Claude Desktop and let your assistant help you
-### Examples
-**Query Accounts**
-```text
-Get all accounts from QuickBooks.
-```
-
-**Query Bills**
-```text
-Get all bills from QuickBooks created after 2024-01-01.
-```
-
-**Query Customers**
-```text
-Get all customers from QuickBooks.
-```
 
 ---
 
-## Docker Setup
+## Admin Portal
 
-The server can be run as a Docker container, which is useful for self-hosted deployments (e.g., Synology NAS).
+The admin portal at port 8888 provides:
 
-### Prerequisites
-- Docker installed on your host machine
-- Your QuickBooks API credentials (Client ID, Client Secret, Refresh Token, Company ID)
+- **Dashboard** — Scheduler status, stats, recent run history
+- **Flagged Items** — Review and resolve AI-flagged transactions
+- **Rules** — Manage categorization rules (CRUD, import/export JSON)
+- **Scheduler** — Configure cron schedule, Anthropic API key, trigger manual runs
+- **Settings** — QuickBooks credentials, password management
 
-### Option A: Build from Source
+### First Login
+
+1. Navigate to `http://localhost:8888`
+2. Login with `admin` / `admin123`
+3. Change your password (required on first login)
+
+### Scheduler
+
+The scheduler uses APScheduler to run AI-powered transaction categorization on a cron schedule:
+
+1. Go to **Scheduler** page
+2. Enter your Anthropic API key and test it
+3. Set a cron schedule (default: `0 23 * * *` = daily at 11 PM)
+4. Enable the scheduler
+5. Optionally click **Run Now** for an immediate run
+
+The categorization workflow:
+1. Pulls uncategorized transactions from QuickBooks
+2. Loads enabled rules from the database
+3. Sends transactions + rules to Claude for AI categorization
+4. Applies categorizations back to QuickBooks
+5. Flags suspicious/ambiguous items for manual review
+6. Saves learned rules suggested by Claude
+
+---
+
+## Docker
+
+### Build from Source
 
 ```bash
-# Clone the repository
-git clone https://github.com/malamaker/quickbooks-mcp-server.git
-cd quickbooks-mcp-server
+# Build for linux/amd64 (Synology deployment)
+docker buildx build --platform linux/amd64 \
+  -t quickbooks-mcp-server:0.2.0 \
+  -t quickbooks-mcp-server:latest \
+  --load .
 
-# Build the image for linux/amd64 (required for Synology)
-docker buildx build --platform linux/amd64 -t quickbooks-mcp-server:latest --load .
-
-# Export as a tar file (for transferring to another machine)
-docker save quickbooks-mcp-server:latest -o quickbooks-mcp-server.tar
+# Export as tar (dual-tagged)
+docker save quickbooks-mcp-server:0.2.0 quickbooks-mcp-server:latest \
+  -o quickbooks-mcp-server.tar
 ```
 
-### Option B: Load from a Pre-built Tar
-
-If you received a `quickbooks-mcp-server.tar` file:
+### Docker Compose
 
 ```bash
-docker load -i quickbooks-mcp-server.tar
+# Start
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop
+docker compose down
 ```
 
-### Running the Container
-
-The server uses stdio transport for MCP communication. Pass your QuickBooks credentials as environment variables:
+### Manual Docker Run
 
 ```bash
-docker run --rm \
-  -e QUICKBOOKS_CLIENT_ID=your_client_id \
-  -e QUICKBOOKS_CLIENT_SECRET=your_client_secret \
-  -e QUICKBOOKS_REFRESH_TOKEN=your_refresh_token \
+docker run -d --name quickbooks-mcp \
+  -p 8080:8080 -p 8888:8888 \
+  -v ./data:/app/data \
+  -e QUICKBOOKS_CLIENT_ID=your_id \
+  -e QUICKBOOKS_CLIENT_SECRET=your_secret \
+  -e QUICKBOOKS_REFRESH_TOKEN=your_token \
   -e QUICKBOOKS_COMPANY_ID=your_company_id \
   -e QUICKBOOKS_ENV=sandbox \
   quickbooks-mcp-server:latest
 ```
 
-Set `QUICKBOOKS_ENV` to `production` when using real QuickBooks data.
+### stdio Mode (Claude Desktop via Docker)
 
-### Claude Desktop Config (Docker)
-
-To use the Docker container with Claude Desktop, update your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "QuickBooks": {
-      "command": "docker",
-      "args": [
-        "run", "--rm", "-i",
-        "-e", "QUICKBOOKS_CLIENT_ID=your_client_id",
-        "-e", "QUICKBOOKS_CLIENT_SECRET=your_client_secret",
-        "-e", "QUICKBOOKS_REFRESH_TOKEN=your_refresh_token",
-        "-e", "QUICKBOOKS_COMPANY_ID=your_company_id",
-        "-e", "QUICKBOOKS_ENV=sandbox",
-        "quickbooks-mcp-server:latest"
-      ]
-    }
-  }
-}
+```bash
+docker run --rm -i \
+  -e MCP_TRANSPORT=stdio \
+  -e QUICKBOOKS_CLIENT_ID=your_id \
+  -e QUICKBOOKS_CLIENT_SECRET=your_secret \
+  -e QUICKBOOKS_REFRESH_TOKEN=your_token \
+  -e QUICKBOOKS_COMPANY_ID=your_company_id \
+  quickbooks-mcp-server:latest
 ```
 
 ---
 
-## Synology Container Manager Setup
-
-These steps walk you through deploying the server on a Synology NAS using Container Manager (Docker).
+## Synology NAS Deployment
 
 ### 1. Load the Image
 
-1. Transfer `quickbooks-mcp-server.tar` to your Synology (e.g., via SMB share or File Station).
+1. Transfer `quickbooks-mcp-server.tar` to your Synology.
 2. Open **Container Manager** > **Image** > **Add** > **Add From File**.
-3. Select `quickbooks-mcp-server.tar` and wait for the import to complete.
-4. You should see `quickbooks-mcp-server:latest` in your image list.
+3. Select the tar file and import.
 
 ### 2. Create the Container
 
 1. Go to **Container Manager** > **Container** > **Create**.
-2. Select the `quickbooks-mcp-server:latest` image.
-3. Name the container (e.g., `quickbooks-mcp`).
-4. Under **Advanced Settings** > **Environment**, add these variables:
+2. Select `quickbooks-mcp-server:latest`.
+3. **Port Settings**: Map `8080:8080` and `8888:8888`.
+4. **Volume**: Map a local folder to `/app/data` for persistent storage.
+5. **Environment Variables**: Set your QuickBooks credentials.
+6. Click **Apply**.
 
-   | Variable | Value |
-   |---|---|
-   | `QUICKBOOKS_CLIENT_ID` | Your QuickBooks Client ID |
-   | `QUICKBOOKS_CLIENT_SECRET` | Your QuickBooks Client Secret |
-   | `QUICKBOOKS_REFRESH_TOKEN` | Your QuickBooks Refresh Token |
-   | `QUICKBOOKS_COMPANY_ID` | Your QuickBooks Company ID |
-   | `QUICKBOOKS_ENV` | `sandbox` or `production` |
+### 3. Network Setup
 
-5. No port mapping or volume mounts are required — the server communicates via stdio.
-6. Click **Apply** to create the container.
+- **Port 8080** (MCP): Expose via Nginx Proxy Manager with SSL for remote Claude.ai access.
+- **Port 8888** (Admin): Keep LAN-only. Do not expose to the internet.
 
-### 3. Notes
+---
 
-- The image is built for `linux/amd64`, which is compatible with most Synology NAS models.
-- The container does not need network ports exposed since MCP uses stdio transport.
-- Store your credentials securely. Do not commit `.env` files or credentials to version control.
-- To update the server, rebuild the tar from the latest source and re-import it via Container Manager.
+## MCP Tools
+
+| Tool | Description |
+|---|---|
+| `get_quickbooks_entity_schema` | Get field schema for a QuickBooks entity |
+| `query_quickbooks` | Execute SQL-like queries on QuickBooks |
+| `update_categorization_rules` | Save AI-learned categorization rules to the database |
+| Auto-registered API tools | All QuickBooks REST API endpoints |
+
+---
+
+## Legal & Responsibility
+
+> [!IMPORTANT]
+> Please read **[DISCLAIMER.md](DISCLAIMER.md)** in full before deploying this software.
+
+This is an independent open source project, **not affiliated with or endorsed by Intuit or Anthropic**. Key points:
+
+- This tool can **read, create, modify, and delete** financial data in your QuickBooks account. Changes are real and may be irreversible.
+- The automated scheduler modifies QuickBooks data **without human approval for each action**. Maintain backups and review results regularly.
+- AI-powered categorization is **not a substitute for a licensed accountant or bookkeeper**. Always have a qualified professional review your financial records.
+- The authors and contributors accept **no responsibility** for data loss, incorrect categorizations, tax filing errors, audit issues, or any financial harm.
+- **Test in QuickBooks Sandbox first** before connecting to production data.
+- This software is provided **"AS IS"** without warranty of any kind.
+
+See [DISCLAIMER.md](DISCLAIMER.md) for the complete disclaimer, including data privacy considerations and detailed risk information.
+
+---
+
+## MCP Review Certification
+
+This MCP Server is **[certified by MCP Review](https://mcpreview.com/mcp-servers/nikhilgy/quickbooks-mcp-server)**.
