@@ -50,10 +50,74 @@ def query_quickbooks(query: str) -> types.TextContent:
         return types.TextContent(type='text', text="Error: QuickBooks session not initialized. Please check your credentials and restart the server.")
     
     try:
-        response = quickbooks.query(query)
+        query_stripped = query.strip()
+        if not query_stripped.upper().startswith("SELECT"):
+            return types.TextContent(type='text', text="Error: Only SELECT queries are supported.")
+        response = quickbooks.query(query_stripped)
         return types.TextContent(type='text', text=str(response))
     except Exception as e:
         return types.TextContent(type='text', text=f"Error executing query: {e}")
+
+def _make_tool_handler(api_method, clean_api_route, api_params_filtered, method_name):
+    def handler(**kwargs):
+        if quickbooks is None:
+            return types.TextContent(type='text', text="Error: QuickBooks session not initialized. Please check your credentials and restart the server.")
+
+        # Workaround for clients that pass all arguments as a single string in 'kwargs'
+        if 'kwargs' in kwargs and isinstance(kwargs['kwargs'], str) and '=' in kwargs['kwargs']:
+            try:
+                key, value = kwargs['kwargs'].split('=', 1)
+                kwargs = {key: value}
+            except Exception:
+                pass
+
+        print(f"Executing '{method_name}' with arguments: {kwargs}", file=sys.stderr)
+
+        try:
+            route = clean_api_route
+
+            path_params = {}
+            query_params = {}
+            request_body = {}
+
+            # Separate parameters based on their location ('in')
+            for p_info in api_params_filtered:
+                p_name = p_info['name']
+                if p_name in kwargs:
+                    if p_info['location'] == 'path':
+                        path_params[p_name] = kwargs[p_name]
+                    elif p_info['location'] == 'query':
+                        query_params[p_name] = kwargs[p_name]
+
+            # The rest of kwargs are assumed to be the request body for POST/PUT/PATCH
+            if api_method.lower() in ['post', 'put', 'patch']:
+                body_keys = set(kwargs.keys()) - set(path_params.keys()) - set(query_params.keys())
+                for k in body_keys:
+                    request_body[k] = kwargs[k]
+
+            # Format the route with path parameters
+            if path_params:
+                try:
+                    route = route.format(**path_params)
+                except KeyError as e:
+                    return types.TextContent(type='text', text=f"Error: Missing required path parameter {e} for route {route}")
+
+            response = quickbooks.call_route(
+                method_type=api_method,
+                route=route,
+                params=query_params,
+                body=request_body if request_body else None
+            )
+
+            print(f"Response from '{method_name}': {response}", file=sys.stderr)
+            return types.TextContent(type='text', text=str(response))
+        except Exception as e:
+            error_msg = f"Error executing {method_name}: {e}"
+            print(error_msg, file=sys.stderr)
+            return types.TextContent(type='text', text=error_msg)
+
+    return handler
+
 
 def register_all_apis():
     apis = load_apis()
@@ -80,7 +144,7 @@ def register_all_apis():
         doc = clean_summary + '. '
         if response_description != "OK":
             doc += f'If successful, the outcome will be \"{api["response_description"]}\". '
-        
+
         # Combine request_data and parameters for the docstring
         all_params = {}
         api_params_filtered = [p for p in api.get('parameters', []) if p['name'] != 'realmId']
@@ -93,81 +157,17 @@ def register_all_apis():
                     'type': p.get('type', 'unknown'),
                     'in': p.get('location')
                 }
-        
+
         if api.get('request_data'):
             doc += f'The request body should be a JSON object with the following structure: {json.dumps(api["request_data"])}. '
 
         if all_params:
             doc += f'Parameters: {json.dumps(all_params, indent=2)}. '
 
-        # Create a more structured tool function definition
-        method_str = f"""
-@mcp.tool()
-def {method_name}(**kwargs) -> types.TextContent:
-    \"\"\"{doc}\"\"\"
-    
-    # Check if QuickBooks is initialized
-    if quickbooks is None:
-        return types.TextContent(type='text', text="Error: QuickBooks session not initialized. Please check your credentials and restart the server.")
-    
-    # Workaround for clients that pass all arguments as a single string in 'kwargs'
-    if 'kwargs' in kwargs and isinstance(kwargs['kwargs'], str) and '=' in kwargs['kwargs']:
-        try:
-            key, value = kwargs['kwargs'].split('=', 1)
-            # Overwrite kwargs with the parsed arguments
-            kwargs = {{key: value}}
-        except Exception:
-            # If parsing fails, do nothing and proceed with the original kwargs
-            pass
-
-    print(f"Executing '{method_name}' with arguments: {{kwargs}}", file=sys.stderr)
-    
-    try:
-        route = \"{clean_api_route}\"
-        api_method = \"{api['method']}\"
-        
-        path_params = {{}}
-        query_params = {{}}
-        request_body = {{}}
-
-        # Separate parameters based on their location ('in')
-        api_params = {api_params_filtered}
-        for p_info in api_params:
-            p_name = p_info['name']
-            if p_name in kwargs:
-                if p_info['location'] == 'path':
-                    path_params[p_name] = kwargs[p_name]
-                elif p_info['location'] == 'query':
-                    query_params[p_name] = kwargs[p_name]
-
-        # The rest of kwargs are assumed to be the request body for POST/PUT/PATCH
-        if api_method.lower() in ['post', 'put', 'patch']:
-            body_keys = set(kwargs.keys()) - set(path_params.keys()) - set(query_params.keys())
-            for k in body_keys:
-                request_body[k] = kwargs[k]
-
-        # Format the route with path parameters
-        if path_params:
-            try:
-                route = route.format(**path_params)
-            except KeyError as e:
-                return types.TextContent(type='text', text=f"Error: Missing required path parameter {{e}} for route {{route}}")
-
-        response = quickbooks.call_route(
-            method_type=api_method,
-            route=route,
-            params=query_params,
-            body=request_body if request_body else None
-        )
-        
-        print(f"Response from '{method_name}': {{response}}", file=sys.stderr)
-        return types.TextContent(type='text', text=str(response))
-    except Exception as e:
-        error_msg = f"Error executing {method_name}: {{e}}"
-        print(error_msg, file=sys.stderr)
-        return types.TextContent(type='text', text=error_msg)
-"""
-        exec(method_str, globals(), locals())
+        handler = _make_tool_handler(api['method'], clean_api_route, api_params_filtered, method_name)
+        handler.__name__ = method_name
+        handler.__doc__ = doc
+        mcp.tool()(handler)
 
 register_all_apis()
 

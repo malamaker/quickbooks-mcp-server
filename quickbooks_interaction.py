@@ -53,11 +53,18 @@ class QuickBooksSession:
             print(message, file=sys.stderr)
             raise Exception(message)
 
+    ALLOWED_METHODS = {'get', 'post', 'put', 'patch', 'delete'}
+
     def call_route(self, method_type, route, params: dict = None, body: dict = None):
+        if method_type not in self.ALLOWED_METHODS:
+            raise ValueError(f"Unsupported HTTP method: {method_type}")
         method = getattr(requests, method_type)
+
+        if '..' in route:
+            raise ValueError(f"Invalid route: {route}")
         if not route.startswith('/'):
             route = '/' + route
-        
+
         url = f"{self.base_url}/v3/company/{self.company_id}{route}"
 
         if method_type == 'get':
@@ -114,4 +121,4 @@ class QuickBooksSession:
 
 if __name__ == '__main__':
     quickbooks = QuickBooksSession()
-    print("Access token:", quickbooks.access_token) 
+    print("QuickBooks session initialized successfully") 
