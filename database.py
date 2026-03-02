@@ -99,6 +99,24 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    title TEXT NOT NULL DEFAULT 'New Conversation',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'tool_call', 'tool_result')),
+    content TEXT NOT NULL,
+    tool_name TEXT,
+    tool_call_id TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -459,6 +477,112 @@ async def get_all_settings() -> dict:
             else:
                 result[row["key"]] = None
         return result
+    finally:
+        await db.close()
+
+
+# ---------------------------------------------------------------------------
+# Conversations & Chat Messages
+# ---------------------------------------------------------------------------
+
+async def create_conversation(user_id: int, title: str = "New Conversation") -> int:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "INSERT INTO conversations (user_id, title) VALUES (?, ?)",
+            (user_id, title),
+        )
+        await db.commit()
+        return cursor.lastrowid
+    finally:
+        await db.close()
+
+
+async def get_conversations(user_id: int) -> list[dict]:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT * FROM conversations WHERE user_id = ? ORDER BY updated_at DESC",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+async def get_conversation(conversation_id: int, user_id: int) -> dict | None:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT * FROM conversations WHERE id = ? AND user_id = ?",
+            (conversation_id, user_id),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+
+async def update_conversation_title(conversation_id: int, title: str):
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
+            (title, datetime.now(timezone.utc).isoformat(), conversation_id),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def delete_conversation(conversation_id: int, user_id: int):
+    db = await get_db()
+    try:
+        await db.execute(
+            "DELETE FROM conversations WHERE id = ? AND user_id = ?",
+            (conversation_id, user_id),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def touch_conversation(conversation_id: int):
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE conversations SET updated_at = ? WHERE id = ?",
+            (datetime.now(timezone.utc).isoformat(), conversation_id),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def add_chat_message(conversation_id: int, role: str, content: str,
+                           tool_name: str = None, tool_call_id: str = None) -> int:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "INSERT INTO chat_messages (conversation_id, role, content, tool_name, tool_call_id) VALUES (?, ?, ?, ?, ?)",
+            (conversation_id, role, content, tool_name, tool_call_id),
+        )
+        await db.commit()
+        return cursor.lastrowid
+    finally:
+        await db.close()
+
+
+async def get_chat_messages(conversation_id: int) -> list[dict]:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY id ASC",
+            (conversation_id,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
     finally:
         await db.close()
 

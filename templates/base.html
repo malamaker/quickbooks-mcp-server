@@ -16,6 +16,7 @@
             <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
             <li><a href="/flagged" class="{% if '/flagged' in request.url.path %}active{% endif %}">Flagged Items</a></li>
             <li><a href="/rules" class="{% if '/rules' in request.url.path %}active{% endif %}">Rules</a></li>
+            <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">Chat</a></li>
             <li><a href="/scheduler" class="{% if '/scheduler' in request.url.path %}active{% endif %}">Scheduler</a></li>
             <li><a href="/settings" class="{% if '/settings' in request.url.path %}active{% endif %}">Settings</a></li>
         </ul>

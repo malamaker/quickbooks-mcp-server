@@ -3,6 +3,7 @@
 import json
 import os
 import asyncio
+import traceback
 from pathlib import Path
 from functools import wraps
 
@@ -13,6 +14,157 @@ from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeTimedSerializer, BadSignature
 
 import database as db
+
+# ---------------------------------------------------------------------------
+# Chat — Tool definitions for Anthropic API
+# ---------------------------------------------------------------------------
+
+CHAT_TOOLS = [
+    {
+        "name": "get_quickbooks_entity_schema",
+        "description": "Fetches the schema for a given QuickBooks entity (e.g., 'Bill', 'Customer'). Use this to understand available fields before querying.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "entity_name": {"type": "string", "description": "The QuickBooks entity name, e.g. 'Bill', 'Customer', 'Invoice'"}
+            },
+            "required": ["entity_name"]
+        }
+    },
+    {
+        "name": "query_quickbooks",
+        "description": "Executes a SQL-like SELECT query on a QuickBooks entity. Always use get_quickbooks_entity_schema first to learn the available fields.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "SQL-like query, e.g. SELECT * FROM Customer"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "update_categorization_rules",
+        "description": "Save categorization rules to the database. Accepts a JSON array of rule objects with: rule_type, pattern, category, description.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "rules": {"type": "string", "description": "JSON array of rule objects"}
+            },
+            "required": ["rules"]
+        }
+    },
+]
+
+
+async def _execute_tool_async(name: str, tool_input: dict) -> str:
+    """Async wrapper for tool execution."""
+    from main_quickbooks_mcp import get_quickbooks_entity_schema, query_quickbooks, update_categorization_rules
+    try:
+        if name == "get_quickbooks_entity_schema":
+            result = get_quickbooks_entity_schema(**tool_input)
+        elif name == "query_quickbooks":
+            result = query_quickbooks(**tool_input)
+        elif name == "update_categorization_rules":
+            result = await update_categorization_rules(**tool_input)
+        else:
+            return f"Unknown tool: {name}"
+        return result.text if hasattr(result, 'text') else str(result)
+    except Exception as e:
+        return f"Tool error: {e}"
+
+
+def _build_api_messages(db_messages: list[dict]) -> list[dict]:
+    """Convert DB chat_messages rows into Anthropic API message format.
+
+    Merges assistant text + adjacent tool_call rows into a single assistant
+    message with text + tool_use content blocks (required by the API).
+    """
+    api_messages = []
+    i = 0
+    while i < len(db_messages):
+        msg = db_messages[i]
+        role = msg["role"]
+
+        if role == "user":
+            api_messages.append({"role": "user", "content": msg["content"]})
+            i += 1
+
+        elif role == "assistant":
+            # Check if followed by tool_call — merge into one assistant message
+            if i + 1 < len(db_messages) and db_messages[i + 1]["role"] == "tool_call":
+                content_blocks = [{"type": "text", "text": msg["content"]}]
+                i += 1
+                while i < len(db_messages) and db_messages[i]["role"] == "tool_call":
+                    tc = db_messages[i]
+                    content_blocks.append({
+                        "type": "tool_use",
+                        "id": tc["tool_call_id"],
+                        "name": tc["tool_name"],
+                        "input": json.loads(tc["content"]),
+                    })
+                    i += 1
+                api_messages.append({"role": "assistant", "content": content_blocks})
+                # Collect tool_result entries
+                result_blocks = []
+                while i < len(db_messages) and db_messages[i]["role"] == "tool_result":
+                    tr = db_messages[i]
+                    result_blocks.append({
+                        "type": "tool_result",
+                        "tool_use_id": tr["tool_call_id"],
+                        "content": tr["content"],
+                    })
+                    i += 1
+                if result_blocks:
+                    api_messages.append({"role": "user", "content": result_blocks})
+            else:
+                api_messages.append({"role": "assistant", "content": msg["content"]})
+                i += 1
+
+        elif role == "tool_call":
+            # Tool calls without preceding text
+            content_blocks = []
+            while i < len(db_messages) and db_messages[i]["role"] == "tool_call":
+                tc = db_messages[i]
+                content_blocks.append({
+                    "type": "tool_use",
+                    "id": tc["tool_call_id"],
+                    "name": tc["tool_name"],
+                    "input": json.loads(tc["content"]),
+                })
+                i += 1
+            api_messages.append({"role": "assistant", "content": content_blocks})
+
+            # Collect matching tool_result entries
+            result_blocks = []
+            while i < len(db_messages) and db_messages[i]["role"] == "tool_result":
+                tr = db_messages[i]
+                result_blocks.append({
+                    "type": "tool_result",
+                    "tool_use_id": tr["tool_call_id"],
+                    "content": tr["content"],
+                })
+                i += 1
+            if result_blocks:
+                api_messages.append({"role": "user", "content": result_blocks})
+
+        elif role == "tool_result":
+            # Orphan tool_result (shouldn't happen but handle gracefully)
+            api_messages.append({
+                "role": "user",
+                "content": [{"type": "tool_result", "tool_use_id": msg["tool_call_id"], "content": msg["content"]}]
+            })
+            i += 1
+        else:
+            i += 1
+
+    return api_messages
+
+
+CHAT_SYSTEM_PROMPT = (
+    "You are a QuickBooks assistant. You help users query and manage their QuickBooks data. "
+    "Use the available tools to look up entity schemas and run queries. "
+    "Always check the schema before querying an entity. Be concise and helpful."
+)
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -580,3 +732,170 @@ async def update_password(
     resp = RedirectResponse("/settings", status_code=302)
     _flash_to_cookie(resp, [{"message": "Password changed successfully.", "category": "success"}])
     return resp
+
+
+# ---------------------------------------------------------------------------
+# Chat
+# ---------------------------------------------------------------------------
+
+@app.get("/chat", response_class=HTMLResponse)
+@require_auth
+async def chat_page(request: Request):
+    conversations = await db.get_conversations(request.state.session["user_id"])
+    ctx = _ctx(request, request.state.session, {"conversations": conversations})
+    resp = templates.TemplateResponse("chat.html", ctx)
+    _set_session(resp, request.state.session)
+    _clear_flash_cookie(resp)
+    return resp
+
+
+@app.post("/chat/conversations")
+@require_auth
+async def chat_create_conversation(request: Request):
+    cid = await db.create_conversation(request.state.session["user_id"])
+    conv = await db.get_conversation(cid, request.state.session["user_id"])
+    return JSONResponse({"id": conv["id"], "title": conv["title"]})
+
+
+@app.get("/chat/conversations/{conversation_id}/messages")
+@require_auth
+async def chat_get_messages(request: Request, conversation_id: int):
+    conv = await db.get_conversation(conversation_id, request.state.session["user_id"])
+    if not conv:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    messages = await db.get_chat_messages(conversation_id)
+    return JSONResponse({"messages": messages, "title": conv["title"]})
+
+
+@app.delete("/chat/conversations/{conversation_id}")
+@require_auth
+async def chat_delete_conversation(request: Request, conversation_id: int):
+    await db.delete_conversation(conversation_id, request.state.session["user_id"])
+    return JSONResponse({"status": "ok"})
+
+
+@app.patch("/chat/conversations/{conversation_id}")
+@require_auth
+async def chat_rename_conversation(request: Request, conversation_id: int):
+    body = await request.json()
+    title = body.get("title", "").strip()
+    if not title:
+        return JSONResponse({"error": "Title required"}, status_code=400)
+    await db.update_conversation_title(conversation_id, title)
+    return JSONResponse({"status": "ok"})
+
+
+@app.post("/chat/send")
+@require_auth
+async def chat_send(request: Request):
+    body = await request.json()
+    conversation_id = body.get("conversation_id")
+    message = body.get("message", "").strip()
+    if not conversation_id or not message:
+        return JSONResponse({"error": "conversation_id and message required"}, status_code=400)
+
+    # Verify ownership
+    conv = await db.get_conversation(conversation_id, request.state.session["user_id"])
+    if not conv:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    # Save user message
+    await db.add_chat_message(conversation_id, "user", message)
+    await db.touch_conversation(conversation_id)
+
+    async def event_stream():
+        try:
+            import anthropic
+
+            # Get API key from scheduler config
+            config = await db.get_scheduler_config()
+            api_key = config.get("anthropic_api_key") if config else None
+            if not api_key:
+                yield f"data: {json.dumps({'type': 'error', 'content': 'No Anthropic API key configured. Go to Scheduler settings to add one.'})}\n\n"
+                return
+
+            client = anthropic.AsyncAnthropic(api_key=api_key)
+            is_first_response = conv["title"] == "New Conversation"
+
+            while True:
+                # Build messages from DB
+                db_messages = await db.get_chat_messages(conversation_id)
+                api_messages = _build_api_messages(db_messages)
+
+                # Stream response from Claude
+                full_text = ""
+                tool_calls = []
+
+                async with client.messages.stream(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=4096,
+                    system=CHAT_SYSTEM_PROMPT,
+                    messages=api_messages,
+                    tools=CHAT_TOOLS,
+                ) as stream:
+                    async for event in stream:
+                        if event.type == "content_block_start":
+                            if event.content_block.type == "tool_use":
+                                tool_calls.append({
+                                    "id": event.content_block.id,
+                                    "name": event.content_block.name,
+                                    "input_json": "",
+                                })
+                                yield f"data: {json.dumps({'type': 'tool_start', 'name': event.content_block.name, 'tool_call_id': event.content_block.id})}\n\n"
+
+                        elif event.type == "content_block_delta":
+                            if event.delta.type == "text_delta":
+                                full_text += event.delta.text
+                                yield f"data: {json.dumps({'type': 'text', 'content': event.delta.text})}\n\n"
+                            elif event.delta.type == "input_json_delta":
+                                if tool_calls:
+                                    tool_calls[-1]["input_json"] += event.delta.partial_json
+
+                    final_message = await stream.get_final_message()
+
+                # Auto-title from first response
+                if is_first_response and full_text:
+                    title = full_text[:50].split("\n")[0]
+                    if len(full_text) > 50:
+                        title += "..."
+                    await db.update_conversation_title(conversation_id, title)
+                    yield f"data: {json.dumps({'type': 'title_update', 'title': title})}\n\n"
+                    is_first_response = False
+
+                # If no tool calls, save assistant message and finish
+                if final_message.stop_reason != "tool_use":
+                    if full_text:
+                        await db.add_chat_message(conversation_id, "assistant", full_text)
+                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                    return
+
+                # Save text that came before tool calls (must precede tool_call rows in DB)
+                if full_text:
+                    await db.add_chat_message(conversation_id, "assistant", full_text)
+                    full_text = ""
+
+                # Handle tool calls: save them, execute, save results, then loop
+                for tc in tool_calls:
+                    tool_input = json.loads(tc["input_json"]) if tc["input_json"] else {}
+                    await db.add_chat_message(
+                        conversation_id, "tool_call",
+                        json.dumps(tool_input),
+                        tool_name=tc["name"], tool_call_id=tc["id"]
+                    )
+
+                    # Execute tool
+                    result = await _execute_tool_async(tc["name"], tool_input)
+                    await db.add_chat_message(
+                        conversation_id, "tool_result",
+                        result,
+                        tool_name=tc["name"], tool_call_id=tc["id"]
+                    )
+                    yield f"data: {json.dumps({'type': 'tool_result', 'name': tc['name'], 'tool_call_id': tc['id'], 'content': result})}\n\n"
+
+                # Loop continues — will re-call Claude with tool results
+
+        except Exception as e:
+            traceback.print_exc()
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
