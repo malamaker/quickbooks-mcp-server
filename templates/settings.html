@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+
+<div class="card">
+    <h2>QuickBooks Credentials</h2>
+    <p>Update your QuickBooks API credentials. Leave fields blank to keep existing values.</p>
+    <form method="post" action="/settings/quickbooks">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="client_id">Client ID</label>
+                <input type="text" name="client_id" id="client_id" class="form-input" placeholder="Leave blank to keep current">
+            </div>
+            <div class="form-group">
+                <label for="client_secret">Client Secret</label>
+                <input type="password" name="client_secret" id="client_secret" class="form-input" placeholder="Leave blank to keep current">
+            </div>
+            <div class="form-group">
+                <label for="refresh_token">Refresh Token</label>
+                <input type="password" name="refresh_token" id="refresh_token" class="form-input" placeholder="Leave blank to keep current">
+            </div>
+            <div class="form-group">
+                <label for="company_id">Company ID</label>
+                <input type="text" name="company_id" id="company_id" class="form-input" placeholder="Leave blank to keep current">
+            </div>
+            <div class="form-group">
+                <label for="qb_env">Environment</label>
+                <select name="qb_env" id="qb_env" class="form-select">
+                    <option value="sandbox">Sandbox</option>
+                    <option value="production">Production</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Credentials</button>
+            <button type="button" class="btn btn-secondary" onclick="testQbConnection()">Test Connection</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Change Password</h2>
+    <form method="post" action="/settings/password">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="current_password">Current Password</label>
+                <input type="password" name="current_password" id="current_password" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="new_password">New Password</label>
+                <input type="password" name="new_password" id="new_password" class="form-input" required minlength="8">
+            </div>
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" name="confirm_password" id="confirm_password" class="form-input" required minlength="8">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Change Password</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

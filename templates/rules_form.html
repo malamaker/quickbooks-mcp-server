@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if rule else "Create" }} Rule{% endblock %}
+{% block content %}
+<h1>{{ "Edit" if rule else "Create" }} Rule</h1>
+
+<div class="card">
+    <form method="post" action="{{ '/rules/' ~ rule.id if rule else '/rules' }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="rule_type">Type</label>
+                <select name="rule_type" id="rule_type" class="form-select" required>
+                    <option value="vendor_category" {% if rule and rule.rule_type == 'vendor_category' %}selected{% endif %}>Vendor Category</option>
+                    <option value="always_ignore" {% if rule and rule.rule_type == 'always_ignore' %}selected{% endif %}>Always Ignore</option>
+                    <option value="threshold_flag" {% if rule and rule.rule_type == 'threshold_flag' %}selected{% endif %}>Threshold Flag</option>
+                    <option value="personal_card_exclude" {% if rule and rule.rule_type == 'personal_card_exclude' %}selected{% endif %}>Personal Card Exclude</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="pattern">Pattern</label>
+                <input type="text" name="pattern" id="pattern" class="form-input" required value="{{ rule.pattern if rule else '' }}">
+            </div>
+            <div class="form-group">
+                <label for="category">Category</label>
+                <input type="text" name="category" id="category" class="form-input" value="{{ rule.category if rule and rule.category else '' }}">
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <input type="text" name="description" id="description" class="form-input" value="{{ rule.description if rule and rule.description else '' }}">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ "Update" if rule else "Create" }}</button>
+            <a href="/rules" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

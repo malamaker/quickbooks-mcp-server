@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Disclaimer{% endblock %}
+{% block content %}
+<div class="disclaimer-container">
+    <h1>Disclaimer & Risk Warning</h1>
+    <p><strong>Please read this entire document before deploying or using this software.</strong></p>
+
+    <hr>
+
+    <h2>Independent Project</h2>
+    <p>This is an independent, community-driven open source project. It is <strong>not affiliated with, endorsed by, sponsored by, or officially connected to Intuit Inc., QuickBooks, or Anthropic PBC</strong> in any way. QuickBooks is a registered trademark of Intuit Inc. Claude is a product of Anthropic PBC. All trademarks belong to their respective owners.</p>
+
+    <hr>
+
+    <h2>What This Software Does</h2>
+    <p>This tool connects directly to the QuickBooks API using your credentials and can <strong>read, create, modify, and delete financial data</strong> in your QuickBooks account. This includes but is not limited to:</p>
+    <ul>
+        <li>Querying transactions, invoices, bills, customers, vendors, and accounts</li>
+        <li>Creating and updating transaction categorizations</li>
+        <li>Modifying existing records through the QuickBooks API</li>
+        <li>Deleting or altering financial data when instructed by an MCP client or the automated scheduler</li>
+    </ul>
+    <p><strong>Any changes made to your QuickBooks data through this tool are real and may be difficult or impossible to undo.</strong></p>
+
+    <hr>
+
+    <h2>No Warranty</h2>
+    <p>This software is provided <strong>"AS IS"</strong>, without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement. The entire risk as to the quality and performance of this software is with you.</p>
+
+    <hr>
+
+    <h2>Limitation of Liability</h2>
+    <p>In no event shall the authors, contributors, or maintainers of this project be held liable for any claim, damages, or other liability arising from the use of this software. This includes but is not limited to:</p>
+    <ul>
+        <li><strong>Data loss</strong> or corruption in your QuickBooks account</li>
+        <li><strong>Incorrect transaction categorizations</strong> applied automatically or manually</li>
+        <li><strong>Tax filing errors</strong> resulting from miscategorized transactions</li>
+        <li><strong>Audit issues</strong> caused by inaccurate or incomplete financial records</li>
+        <li><strong>Financial harm</strong> of any kind, whether direct, indirect, incidental, or consequential</li>
+        <li><strong>Unauthorized access</strong> to your QuickBooks data due to misconfiguration</li>
+    </ul>
+    <p><strong>You use this software entirely at your own risk.</strong></p>
+
+    <hr>
+
+    <h2>AI Categorization Is Not Accounting Advice</h2>
+    <p>The automated scheduler uses AI (Claude by Anthropic) to categorize financial transactions. While AI can be a helpful tool, it is important to understand that:</p>
+    <ul>
+        <li>AI categorization is <strong>not a substitute for a licensed accountant, CPA, or professional bookkeeper</strong></li>
+        <li>AI models can and do make mistakes, including confidently incorrect categorizations</li>
+        <li>Categorization rules learned by the AI may not reflect current tax law or your specific business requirements</li>
+        <li>The AI does not understand your full financial context and may misinterpret transactions</li>
+        <li>Automated categorizations should always be reviewed by a qualified human before being used for tax filing, financial reporting, or business decisions</li>
+    </ul>
+    <p><strong>You are solely responsible for reviewing all AI-generated categorizations before relying on them for any purpose.</strong></p>
+
+    <hr>
+
+    <h2>Automated Scheduler Warning</h2>
+    <p>When the scheduler is enabled, it runs autonomously on a configured schedule and will:</p>
+    <ul>
+        <li>Connect to your QuickBooks account without prompting you each time</li>
+        <li>Pull transaction data and send it to the Anthropic API for AI analysis</li>
+        <li>Apply categorizations back to QuickBooks <strong>without human approval for each individual action</strong></li>
+        <li>Flag certain transactions for review, but process others automatically</li>
+    </ul>
+    <p>Before enabling the scheduler:</p>
+    <ol>
+        <li><strong>Maintain current QuickBooks backups.</strong> Ensure you have a reliable backup strategy in place before enabling any automated features.</li>
+        <li><strong>Start with the scheduler disabled.</strong> Review the categorization rules and test with manual runs before enabling automatic scheduling.</li>
+        <li><strong>Review flagged items regularly.</strong> The system flags uncertain categorizations, but it may also auto-categorize transactions that warranted human review.</li>
+        <li><strong>Monitor run history.</strong> Check the admin portal dashboard and run history after each automated run to verify results.</li>
+    </ol>
+
+    <hr>
+
+    <h2>Test Before Production</h2>
+    <p><strong>Always test in a QuickBooks Sandbox environment first</strong> before connecting this tool to your production QuickBooks account. Only connect to production data after you are confident the tool behaves correctly and you have backups in place.</p>
+
+    <hr>
+
+    <h2>Data Privacy</h2>
+    <p>When using the automated scheduler, your QuickBooks transaction data is sent to the Anthropic API for processing. Review Anthropic's data usage and privacy policies. You are responsible for ensuring this data handling complies with any applicable regulations and your own data governance requirements.</p>
+
+    <hr>
+
+    <h2>USE AT YOUR OWN RISK</h2>
+    <p>This tool is powerful and can save significant time when used responsibly. It can also cause real harm to your financial records if misconfigured or used without proper oversight. Please use it thoughtfully, maintain backups, and always have a qualified professional review your financial records.</p>
+
+    <hr>
+
+    <p><em>This disclaimer applies to all versions of this software and all methods of deployment.</em></p>
+
+    {% if not session %}
+    <div style="margin-top: 1.5rem; text-align: center;">
+        <a href="/login" class="btn btn-primary">Back to Login</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

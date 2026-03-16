@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Scheduler{% endblock %}
+{% block content %}
+<h1>Scheduler Configuration</h1>
+
+<div class="card">
+    <form method="post" action="/scheduler">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="form-group">
+            <label class="toggle-label">
+                <input type="checkbox" name="enabled" value="on" {% if config and config.enabled %}checked{% endif %}>
+                <span>Enable Scheduler</span>
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label for="schedule_cron">Schedule (cron)</label>
+            <input type="text" name="schedule_cron" id="schedule_cron" class="form-input"
+                   value="{{ config.schedule_cron if config else '0 23 * * *' }}"
+                   placeholder="minute hour day month day_of_week">
+            <small>Example: <code>0 23 * * *</code> = daily at 11 PM</small>
+        </div>
+
+        <div class="form-group">
+            <label for="anthropic_api_key">Anthropic API Key</label>
+            <div class="input-group">
+                <input type="password" name="anthropic_api_key" id="anthropic_api_key" class="form-input"
+                       placeholder="{{ '••••••••' if config and config.anthropic_api_key else 'sk-ant-...' }}">
+                <button type="button" class="btn btn-secondary" onclick="testApiKey()">Test Key</button>
+            </div>
+            <small>Required for AI-powered categorization. Leave blank to keep existing key.</small>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Configuration</button>
+            <button type="button" class="btn btn-secondary" id="btn-run-now" onclick="runNow()">Run Now</button>
+        </div>
+    </form>
+</div>
+
+<div class="section">
+    <h2>Last Run</h2>
+    {% if config and config.last_run_at %}
+    <table class="info-table">
+        <tr><td>Time</td><td>{{ config.last_run_at }}</td></tr>
+        <tr><td>Status</td><td><span class="badge badge-{{ config.last_run_status }}">{{ config.last_run_status }}</span></td></tr>
+        <tr><td>Summary</td><td>{{ config.last_run_summary or "N/A" }}</td></tr>
+    </table>
+    {% else %}
+    <p class="empty-state">No runs yet.</p>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>Run History</h2>
+    {% if runs %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Trigger</th>
+                <th>Status</th>
+                <th>Processed</th>
+                <th>Categorized</th>
+                <th>Flagged</th>
+                <th>Duration</th>
+                <th>Summary</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in runs %}
+            <tr>
+                <td>{{ run.run_at }}</td>
+                <td>{{ run.triggered_by }}</td>
+                <td><span class="badge badge-{{ run.status }}">{{ run.status }}</span></td>
+                <td>{{ run.transactions_processed }}</td>
+                <td>{{ run.transactions_categorized }}</td>
+                <td>{{ run.transactions_flagged }}</td>
+                <td>{{ run.duration_seconds or "—" }}s</td>
+                <td>{{ run.summary_text or "—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No run history.</p>
+    {% endif %}
+</div>
+{% endblock %}

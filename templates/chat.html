@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Chat{% endblock %}
+
+{% block content %}
+<div class="chat-layout">
+    <!-- Left panel: conversation list -->
+    <div class="chat-sidebar">
+        <div class="chat-sidebar-header">
+            <h3>Conversations</h3>
+            <button class="btn btn-primary btn-sm" id="new-conv-btn">+ New</button>
+        </div>
+        <ul class="conv-list" id="conv-list">
+            {% for c in conversations %}
+            <li class="conv-item" data-id="{{ c.id }}">
+                <span class="conv-item-title">{{ c.title }}</span>
+                <button class="conv-item-del" title="Delete">&times;</button>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- Right panel: messages + input -->
+    <div class="chat-main">
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-welcome" id="chat-welcome">
+                <h2>QuickBooks Assistant</h2>
+                <p>Ask me anything about your QuickBooks data.</p>
+            </div>
+        </div>
+        <div class="chat-input-area" id="chat-input-area" style="display:none;">
+            <textarea id="chat-input" rows="1" placeholder="Type a message..."></textarea>
+            <button class="chat-send-btn" id="chat-send-btn">Send</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/chat.js"></script>
+{% endblock %}

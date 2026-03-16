@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.pending_flagged }}</div>
+        <div class="stat-label">Pending Flagged</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_runs }}</div>
+        <div class="stat-label">Total Runs</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_categorized }}</div>
+        <div class="stat-label">Categorized</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.active_rules }}</div>
+        <div class="stat-label">Active Rules</div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="section-header">
+        <h2>Scheduler Status</h2>
+        <button class="btn btn-primary" id="btn-run-now" onclick="runNow()">Run Now</button>
+    </div>
+    <table class="info-table">
+        <tr><td>Status</td><td>{{ "Enabled" if config and config.enabled else "Disabled" }}</td></tr>
+        <tr><td>Schedule</td><td>{{ config.schedule_cron if config else "Not configured" }}</td></tr>
+        <tr><td>Last Run</td><td>{{ config.last_run_at or "Never" if config else "Never" }}</td></tr>
+        <tr><td>Last Status</td><td>{{ config.last_run_status or "N/A" if config else "N/A" }}</td></tr>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Recent Runs</h2>
+    {% if recent_runs %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Trigger</th>
+                <th>Status</th>
+                <th>Processed</th>
+                <th>Categorized</th>
+                <th>Flagged</th>
+                <th>Duration</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in recent_runs %}
+            <tr>
+                <td>{{ run.run_at }}</td>
+                <td>{{ run.triggered_by }}</td>
+                <td><span class="badge badge-{{ run.status }}">{{ run.status }}</span></td>
+                <td>{{ run.transactions_processed }}</td>
+                <td>{{ run.transactions_categorized }}</td>
+                <td>{{ run.transactions_flagged }}</td>
+                <td>{{ run.duration_seconds }}s</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No runs yet. Configure the scheduler or trigger a manual run.</p>
+    {% endif %}
+</div>
+{% endblock %}

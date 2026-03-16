@@ -1,0 +1,24 @@
+# WARNING: This container modifies live QuickBooks financial data.
+# Review DISCLAIMER.md before deploying to a production environment.
+# Ensure QuickBooks backups are configured before enabling the scheduler.
+
+services:
+  quickbooks-mcp:
+    build: .
+    image: quickbooks-mcp-server:latest
+    container_name: quickbooks-mcp
+    ports:
+      - "8080:8080"
+      - "8888:8888"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - MCP_TRANSPORT=streamable-http
+      - QUICKBOOKS_CLIENT_ID=${QUICKBOOKS_CLIENT_ID}
+      - QUICKBOOKS_CLIENT_SECRET=${QUICKBOOKS_CLIENT_SECRET}
+      - QUICKBOOKS_REFRESH_TOKEN=${QUICKBOOKS_REFRESH_TOKEN}
+      - QUICKBOOKS_COMPANY_ID=${QUICKBOOKS_COMPANY_ID}
+      - QUICKBOOKS_ENV=${QUICKBOOKS_ENV:-sandbox}
+      - SECRET_KEY=${SECRET_KEY:-}
+      - DATA_DIR=/app/data
+    restart: unless-stopped

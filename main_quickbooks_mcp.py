@@ -2,8 +2,10 @@ from mcp import types
 from mcp.server.fastmcp import FastMCP
 from quickbooks_interaction import QuickBooksSession
 from api_importer import load_apis
+from environment import Environment
 import sys
 import json
+import asyncio
 from pathlib import Path
 
 # Initialize QuickBooks session with error handling
@@ -171,6 +173,67 @@ def register_all_apis():
 
 register_all_apis()
 
+
+@mcp.tool()
+async def update_categorization_rules(rules: str) -> types.TextContent:
+    """
+    Save categorization rules to the database. Accepts a JSON array of rule objects.
+    Each rule should have: rule_type (vendor_category|always_ignore|threshold_flag|personal_card_exclude),
+    pattern, category (optional), description (optional).
+    This allows Claude to persist rules learned during manual conversations.
+    """
+    try:
+        from database import create_rule
+        rules_list = json.loads(rules)
+        if not isinstance(rules_list, list):
+            return types.TextContent(type='text', text="Error: Expected a JSON array of rule objects.")
+        created = 0
+        for r in rules_list:
+            await create_rule(
+                rule_type=r.get("rule_type", "vendor_category"),
+                pattern=r.get("pattern", ""),
+                category=r.get("category"),
+                description=r.get("description"),
+                source="learned",
+            )
+            created += 1
+        return types.TextContent(type='text', text=f"Successfully saved {created} rule(s).")
+    except json.JSONDecodeError:
+        return types.TextContent(type='text', text="Error: Invalid JSON. Expected a JSON array of rule objects.")
+    except Exception as e:
+        return types.TextContent(type='text', text=f"Error saving rules: {e}")
+
+
+async def main():
+    from bootstrap import bootstrap
+    from scheduler_engine import configure_scheduler
+
+    await bootstrap()
+
+    transport = Environment.get('MCP_TRANSPORT', 'stdio')
+    print(f"Starting MCP server ({transport})...", file=sys.stderr)
+
+    if transport == 'stdio':
+        # stdio mode: MCP only, no admin portal or scheduler
+        mcp.run(transport='stdio')
+        return
+
+    # HTTP mode: run MCP server + admin portal + scheduler concurrently
+    await configure_scheduler()
+
+    import uvicorn
+    from admin_portal import app as admin_app
+
+    mcp_app = mcp.streamable_http_app()
+    mcp_config = uvicorn.Config(mcp_app, host="0.0.0.0", port=8080, log_level="info")
+    admin_config = uvicorn.Config(admin_app, host="0.0.0.0", port=8888, log_level="info")
+
+    mcp_server = uvicorn.Server(mcp_config)
+    admin_server = uvicorn.Server(admin_config)
+
+    print("MCP server on port 8080, Admin portal on port 8888", file=sys.stderr)
+    await asyncio.gather(mcp_server.serve(), admin_server.serve())
+
+
 if __name__ == "__main__":
-    print("Starting MCP server...")
-    mcp.run(transport='stdio') 
+    asyncio.run(main())
